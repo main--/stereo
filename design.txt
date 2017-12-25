@@ -1,0 +1,83 @@
+mono_object_new / mono_object_new_specific
+mono_array_new_full (dimensions)
+mono_array_new_specific
+
+(objectarray in general)
+
+mono_ldstr
+string interning (???)
+mono_object_hash
+mono_object_to_string
+mono_object_clone
+
+(un)boxing
+
+obj_get_domain
+
+monitor locking
+
+exceptions
+
+object ctor / class ctor
+
+mono_object_get_virtual_method
+mono_get_delegate_invoke
+mono_runtime_delegate_invoke
+mono_runtime_invoke_array
+mono_method_get_umanaged_thunk
+
+proper mono_runtime_invoke
+running Main (plethora of ways)
+remoting ???????
+field get/set instance/static
+property get/set
+reference queues
+
+
+
+appdomains, ids, names
+appdomain get/set, foreach, loading assemblies
+
+mono_get_corlib
+mono_get_*_class
+
+assemblies, esp. bundled ones
+vtable API
+
+mono_class_from_typeref
+mono_class_from_generic_parameter
+mono_class_inflate_generic_type
+mono_class_inflate_generic_method
+mono_get_inflated_method (?)
+mono_field_from_token
+mono_bounded_array_class_get (?)
+mono_array_class_get
+mono_ptr_class_get
+class field,event,property (name+tokens)
+mono_class_instance_size
+mono_class_array_element_size
+mono_class_value_size
+mono_class_is_subclass_of
+mono_class_is_assignable_from
+ldtoken ??
+OMG SO MANY CLASS THINGS
+
+monotype api
+
+exceptions ...
+
+image:
+from data
+read properties
+
+method api
+
+icalls
+
+GC api?
+
+threads api
+
+token api (get token types and stuff)
+
+
