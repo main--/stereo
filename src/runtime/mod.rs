@@ -1,5 +1,8 @@
 use std::mem::ManuallyDrop;
 use std::ffi::CString;
+use std::marker::PhantomData;
+use std::ops::Deref;
+use std::cell::Cell;
 
 use metadata::{Image, Class};
 use native;
@@ -12,6 +15,51 @@ pub use self::assembly::Assembly;
 pub struct Mono {
     root_domain: ManuallyDrop<AppDomain<'static>>,
     corlib: ManuallyDrop<Image<'static>>,
+    unsync: PhantomData<*mut ()>,
+}
+
+pub struct MonoRef<'a> {
+    mono: &'a Mono,
+}
+unsafe impl<'a> Send for MonoRef<'a> {}
+unsafe impl<'a> Sync for MonoRef<'a> {}
+thread_local!(static ATTACH_REFCOUNT: Cell<usize> = Cell::new(0));
+impl<'a> MonoRef<'a> {
+    pub fn attach(&self) -> AttachedMono<'a> {
+        // Safety:
+        // mono_thread_attach is a nop for already-attached threads.
+        // Since there is no way to prevent you from attaching the same thread multiple times
+        // through the type system, we use reference counting instead.
+        ATTACH_REFCOUNT.with(|counter| counter.set(counter.get() + 1));
+
+        unsafe {
+            let thread = native::mono_thread_attach(self.mono.root_domain.as_raw());
+            AttachedMono { thread, mono: self.mono }
+        }
+    }
+}
+
+pub struct AttachedMono<'a> {
+    thread: *mut native::MonoThread,
+    mono: &'a Mono,
+}
+
+impl<'a> Deref for AttachedMono<'a> {
+    type Target = Mono;
+
+    fn deref(&self) -> &Mono {
+        self.mono
+    }
+}
+impl<'a> Drop for AttachedMono<'a> {
+    fn drop(&mut self) {
+        ATTACH_REFCOUNT.with(|counter| {
+            counter.set(counter.get() - 1);
+            if counter.get() == 0 {
+                unsafe { native::mono_thread_detach(self.thread) };
+            }
+        });
+    }
 }
 
 impl Mono {
@@ -25,9 +73,16 @@ impl Mono {
                 Some(Mono {
                     root_domain: ManuallyDrop::new(AppDomain::from_raw(domain)),
                     corlib: ManuallyDrop::new(Image::from_raw(corlib)),
+                    unsync: PhantomData,
                 })
             }
         }
+    }
+
+    pub fn foreign_handle<'a>(&'a self) -> MonoRef<'static> {
+        // FIXME: this is only valid because Mono can never die
+        let ptr: *const Mono = self;
+        unsafe { MonoRef { mono: &*ptr } }
     }
 
     pub fn root_domain<'a>(&'a self) -> &'a AppDomain<'a> {

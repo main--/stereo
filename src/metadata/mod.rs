@@ -1,4 +1,3 @@
-// pub mod assembly; // ???
 mod image;
 mod class;
 mod method;
