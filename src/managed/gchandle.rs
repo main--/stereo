@@ -1,5 +1,6 @@
 use std::fmt::{Debug, Result as FmtResult, Formatter};
 use std::marker::PhantomData;
+use std::mem;
 
 use super::*;
 use native;
@@ -21,6 +22,12 @@ impl<T: Object> GcHandle<T> {
 
     pub fn target(&self) -> T {
         unsafe { T::from_ptr(native::mono_gchandle_get_target(self.id)) }
+    }
+
+    pub fn downcast(self) -> GcHandle<GenericObject> {
+        let id = self.id;
+        mem::forget(self);
+        GcHandle { id, phantom: PhantomData }
     }
 }
 

@@ -3,6 +3,7 @@ use std::ptr;
 use std::fmt::{Debug, Result as FmtResult, Formatter};
 use std::os::raw::c_void;
 use std::marker::PhantomData;
+use std::borrow::Cow;
 
 use super::*;
 use native;
@@ -25,19 +26,21 @@ impl<'image> Class<'image> {
         self.class
     }
 
-    pub fn namespace(&self) -> Option<&'image CStr> {
+    pub fn namespace(&self) -> Option<&'image str> {
         unsafe {
             let ns = native::mono_class_get_namespace(self.class);
             if *ns == 0 {
                 None
             } else {
-                Some(CStr::from_ptr(ns))
+                Some(CStr::from_ptr(ns).to_str().unwrap())
             }
         }
     }
 
-    pub fn name(&self) -> &'image CStr {
-        unsafe { CStr::from_ptr(native::mono_class_get_name(self.class)) }
+    pub fn name(&self) -> &'image str {
+        unsafe {
+            CStr::from_ptr(native::mono_class_get_name(self.class)).to_str().unwrap()
+        }
     }
 
     pub fn token(&self) -> TypeToken {
@@ -92,10 +95,10 @@ impl<'class, 'image> ExactSizeIterator for ClassMethodsIter<'class, 'image> {}
 
 impl<'image> Debug for Class<'image> {
     fn fmt(&self, fmt: &mut Formatter) -> FmtResult {
-        fmt.write_str("Class ")?;
         if let Some(ns) = self.namespace() {
-            write!(fmt, "{}.", ns.to_string_lossy())?;
+            fmt.write_str(ns)?;
+            fmt.write_str(".")?;
         }
-        fmt.write_str(self.name().to_string_lossy().as_ref())
+        fmt.write_str(self.name().as_ref())
     }
 }

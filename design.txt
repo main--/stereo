@@ -88,6 +88,13 @@ threads api
 * you need the ForeignHandle thing to call attach() to get your own MonoHandle
 * which detaches the thread on drop
 
+assembly loading
+----------------
+
+* we gloss over this completely, the image/assembly distinction is /very/ vague and doesn't seem to matter in practice (except it adds a ref to the Image somehow for some reason???)
+* what really matters is making sure an assembly is loaded into an appdomain before you try to runtime-operate on it
+* for this we have to basically duplicate the metadata APIs into those that still need to ensure this and those that already have (e.g. Method vs RuntimeMethod)
+
 
 
 token api (get token types and stuff)

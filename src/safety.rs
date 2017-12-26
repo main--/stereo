@@ -8,6 +8,7 @@ pub unsafe trait GcPtrStrategy<T: Object> {
 
 pub(crate) const BYPASS: &'static StackRefs = &StackRefs(());
 
+#[derive(Debug)]
 pub struct StackRefs(());
 
 // TODO: /thoroughly/ document all of this
@@ -25,7 +26,7 @@ unsafe impl<T: Object> GcPtrStrategy<T> for StackRefs {
 }
 
 
-
+#[derive(Debug)]
 pub struct GcHandles;
 
 unsafe impl<T: Object> GcPtrStrategy<T> for GcHandles {

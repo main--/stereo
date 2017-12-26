@@ -23,24 +23,6 @@ macro_rules! wrap_ptr {
     )
 }
 
-/*
-macro_rules! gc_ret_single {
-    ( pub fn $fname:ident ( $( $pname:ident : $ptype:ty ),* ) -> $ret:ty $body:block )=> {
-        pub fn $fname <S: ::safety::GcPtrStrategy < $ret >> (
-                $( $pname : $ptype ),* , strat: &S
-                    ) -> S::Target {
-                strat.wrap( $body )
-            }
-    }
-}
-macro_rules! gc_ret {
-    ( $( $fun:item )+ ) => {
-        $(
-            gc_ret_single! { $fun }
-        )+
-    }
-}
- */
 
 macro_rules! gc_ret {
     ( $( pub fn $fname:ident ( $( $pname:ident : $ptype:ty ),* ) -> $ret:ty $body:block )+ ) => {
@@ -53,7 +35,6 @@ macro_rules! gc_ret {
         )+
     }
 }
-// */
 
 
 pub mod managed;
@@ -74,6 +55,7 @@ fn main() {
     println!("lets test ergonomics");
 
     let strat = unsafe { StackRefs::i_promise_to_never_store_references_anywhere_other_than_the_stack() };
+    //let strat = GcHandles;
 
     let mono = Mono::init().unwrap();
     {
@@ -81,15 +63,22 @@ fn main() {
         mono.root_domain().load_assembly(&image).unwrap();
 
         let class = image.class_from_name(Some("MyNS"), "Test").unwrap();
-        let main = class.methods().find(|x| x.name().to_str().unwrap() == "Main").unwrap();
+        let main = class.methods().find(|x| x.name() == "Main").unwrap();
+        println!("main: {:?}", main);
         let args = ObjectArray::from_iter(mono.root_domain(),
                                           &mono.class_string(),
-                                          &[MonoString::empty(mono.root_domain(), &strat),
-                                            MonoString::new("yay", mono.root_domain(), &strat)]);
+                                          &[
+                                              Some(MonoString::empty(mono.root_domain(), &strat).downcast()),
+                                              Some(MonoString::new("yay", mono.root_domain(), &strat).downcast()),
+                                                  ],
+                                          &strat);
+        /*
         let mainargs = ObjectArray::from_iter(mono.root_domain(),
                                               &mono.class_object(),
                                               &[args]);
         let result = main.invoke_array(Null, &mainargs);
+         */
+        let result = main.invoke(None, &[MonoValue::ObjectRef(Some(args.downcast()))], &strat);
         println!("{:?}", result);
     }
 

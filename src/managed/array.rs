@@ -3,10 +3,12 @@ use std::fmt::{Debug, Result as FmtResult, Formatter};
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut, Index};
 use std::os::raw::c_void;
+use std::borrow::Borrow;
 
-use super::{Referencable, Object, Array, MonoPrimitive, ObjectReference};
+use super::{Referencable, GenericObject, Object, Array, MonoPrimitive, ObjectReference};
 use metadata::Class;
 use runtime::AppDomain;
+use safety::{GcPtrStrategy, BYPASS};
 use native;
 
 pub struct ObjectArray(pub /*FIXME*/ *mut native::MonoArray);
@@ -24,18 +26,27 @@ unsafe impl Object for ObjectArray {
 unsafe impl Array for ObjectArray {}
 
 impl ObjectArray {
-    pub fn new(domain: &AppDomain, class: &Class, length: usize) -> ObjectArray {
-        unsafe { ObjectArray(native::mono_array_new(domain.as_raw(), class.as_raw(), length)) }
+    gc_ret! {
+        pub fn new(domain: &AppDomain, class: &Class, length: usize) -> ObjectArray {
+            unsafe { ObjectArray(native::mono_array_new(domain.as_raw(), class.as_raw(), length)) }
+        }
     }
 
-    pub fn from_iter<T>(domain: &AppDomain, class: &Class, iter: T) -> ObjectArray
-        where T: IntoIterator, T::Item: Into<ObjectReference>, T::IntoIter: ExactSizeIterator {
+    // gc_ret! is too dumb to handle this one :(
+    pub fn from_iter<T, S>(domain: &AppDomain,
+                           class: &Class,
+                           iter: T,
+                           strat: &S) -> <S as GcPtrStrategy<ObjectArray>>::Target
+        where T: IntoIterator,
+              T::Item: ::std::borrow::Borrow<Option<<S as GcPtrStrategy<GenericObject>>::Target>>,
+              T::IntoIter: ExactSizeIterator,
+              S: GcPtrStrategy<ObjectArray> + GcPtrStrategy<GenericObject> {
         let iter = iter.into_iter();
-        let array = ObjectArray::new(domain, class, iter.len());
+        let array = ObjectArray::new(domain, class, iter.len(), BYPASS);
         for (i, x) in iter.enumerate() {
-            array.set(i, x);
+            array.set(i, x.borrow(), strat);
         }
-        array
+        strat.wrap(array)
     }
 
     // TODO: indexer mb?
@@ -48,11 +59,16 @@ impl ObjectArray {
         }
     }
 
-    pub fn set<T: Into<ObjectReference>>(&self, index: usize, value: T) {
+    pub fn set<S: GcPtrStrategy<GenericObject>>(&self,
+                                                index: usize,
+                                                value: &Option<S::Target>,
+                                                _strat: &S) {
         assert!(index < self.len());
         unsafe {
             let ptr = native::mono_array_addr_with_size(self.0, mem::size_of::<usize>() as i32, index);
-            native::mono_gc_wbarrier_set_arrayref(self.0, ptr as *mut c_void, value.into().raw());
+            //let ourptr = value.into().raw();
+            let ourptr = value.as_ref().map(Referencable::ptr).unwrap_or(::std::ptr::null_mut());
+            native::mono_gc_wbarrier_set_arrayref(self.0, ptr as *mut c_void, ourptr);
         }
     }
 

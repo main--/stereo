@@ -3,7 +3,7 @@ use std::hash::{Hash, Hasher};
 
 use widestring::{WideStr, WideString};
 
-use safety::{BYPASS, GcPtrStrategy};
+use safety::BYPASS;
 use runtime::AppDomain;
 use super::{Referencable, Object};
 use native;

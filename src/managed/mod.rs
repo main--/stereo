@@ -1,5 +1,6 @@
 use std::ptr;
 
+use metadata::Class;
 use native;
 
 // These wrap actual managed objects
@@ -11,9 +12,12 @@ pub mod object;
 
 // These don't, but are still relevant
 mod gchandle;
+mod value;
 pub mod primitive;
 
 pub use self::gchandle::GcHandle;
+pub use self::value::MonoValue;
+
 use self::object::{GenericObject, ObjectReference};
 use self::primitive::MonoPrimitive;
 
@@ -40,6 +44,10 @@ unsafe impl Referencable for Null {
 
 pub unsafe trait Referencable {
     fn ptr(&self) -> *mut native::MonoObject;
+
+    fn class(&self) -> Class {
+        unsafe { Class::from_raw(native::mono_object_get_class(self.ptr())) }
+    }
 }
 
 unsafe impl<'a, T: Referencable> Referencable for &'a T {

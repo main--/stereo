@@ -5,6 +5,8 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
+    println!("cargo:rustc-link-lib=glib-2.0");
+
     let mono = pkg_config::probe_library("mono-2").unwrap();
 
     let bindings = bindgen::Builder::default()
