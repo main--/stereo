@@ -1,3 +1,4 @@
+use super::ObjectReference;
 use super::object::GenericObject;
 use safety::GcPtrStrategy;
 

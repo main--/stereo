@@ -8,10 +8,9 @@ use std::borrow::Cow;
 use super::*;
 use native;
 use safety::GcPtrStrategy;
-use managed::{Referencable, Object, Array, MonoValue};
-use managed::object::{GenericObject, ObjectReference};
+use managed::{Referenceable, Object, MonoValue, ObjectReference, Primitive};
+use managed::object::{GenericObject}; //, ObjectReference};
 use managed::array::ObjectArray;
-use managed::primitive::MonoPrimitive;
 
 pub struct Method<'image> {
     image: PhantomData<&'image Image<'image>>,
@@ -74,17 +73,19 @@ impl<'image> Method<'image> {
                      this: Option<GenericObject>, // FIXME: mb support value types?
                      params: &[MonoValue<S>],
                      strat: &S) -> Result<Option<S::Target>, S::Target>
-    where S: GcPtrStrategy<GenericObject> {
+        where S: GcPtrStrategy<GenericObject>
+    {
         let argtypes = self.parameters();
         let argcount = argtypes.len();
 
         unsafe {
             let mut args: Vec<_> = argtypes.zip(params).map(|(typ, val)| {
-                let (result, valtype) = match val {
-                    &MonoValue::I32(x) => (x as *mut c_void, i32::class_unsafe()),
-                    &MonoValue::ObjectRef(Some(ref x)) =>
-                        (x.ptr() as *mut c_void, x.class()),
-                    &MonoValue::ObjectRef(None) => return ptr::null_mut(),
+                let (result, valtype) = match *val {
+                    MonoValue::I32(x) => (x as *mut c_void, i32::class_unsafe()),
+                    MonoValue::ObjectRef(Some(ref x)) =>
+                        (x.ptr() as *mut c_void, GenericObject::from_ptr(x.ptr()).class()),
+                    MonoValue::ObjectRef(None) => return ptr::null_mut(),
+
                 };
                 assert!(native::mono_class_is_assignable_from(
                     typ.as_raw(), valtype.as_raw()) != 0, "Invalid parameter type");
@@ -92,14 +93,25 @@ impl<'image> Method<'image> {
             }).collect();
             assert_eq!(args.len(), argcount, "Missing arguments!");
 
-            assert_eq!(this.is_none(), self.is_static(), "Instance vs static method mismatch");
-            let this = this.as_ref().map(Referencable::ptr).unwrap_or(ptr::null_mut()) as *mut c_void;
+            let this = match this {
+                None => {
+                    assert!(self.is_static(), "Attempted to call instance method on null!");
+                    ptr::null_mut()
+                }
+                Some(this) => {
+                    assert!(!self.is_static(), "Attempted to call a static method on an object!");
+                    assert!(native::mono_class_is_assignable_from(
+                        self.class().as_raw(), this.class().as_raw()) != 0, "Invalid this type!");
+
+                    this.ptr() as *mut c_void
+                }
+            };
 
             let mut exception = ptr::null_mut();
             let ret = native::mono_runtime_invoke(self.method,
                                                   this,
                                                   args.as_mut_ptr(),
-                                                  &mut exception );
+                                                  &mut exception);
 
             if exception.is_null() {
                 if ret.is_null() {
@@ -115,14 +127,14 @@ impl<'image> Method<'image> {
 
     // TODO: rework all of this
     #[deprecated]
-    pub fn invoke_array<T: Referencable>(&self, this: T, params: &ObjectArray) -> Result</*val*/ObjectReference, /*exception*/GenericObject> {
+    pub fn invoke_array<T: Referenceable>(&self, this: T, params: &ObjectArray) -> Result<ObjectReference, GenericObject> {
         // TODO: assert array is of type object[]
 
         let mut exception = ptr::null_mut();
         unsafe {
             let ret = native::mono_runtime_invoke_array(self.method,
                                                         this.ptr() as *mut _,
-                                                        Array::ptr(params),
+                                                        params.ptr() as *mut _,
                                                         &mut exception);
             if exception.is_null() {
                 Ok(ObjectReference::from_raw(ret))

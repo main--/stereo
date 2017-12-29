@@ -1,8 +1,10 @@
 use std::fmt::{Debug, Result as FmtResult, Formatter};
 use std::marker::PhantomData;
 use std::mem;
+use std::ops::Deref;
 
 use super::*;
+use safety::{StackRefs, BYPASS};
 use native;
 
 pub struct GcHandle<T: Object> {
@@ -20,7 +22,12 @@ impl<T: Object> GcHandle<T> {
         }
     }
 
-    pub fn target(&self) -> T {
+    pub fn pin(&self) -> PinnedGcHandle<T> {
+        PinnedGcHandle::new(self.target(BYPASS))
+    }
+
+    // this hands out a stackref, so you need to accept the t&c for that
+    pub fn target(&self, _: &StackRefs) -> T {
         unsafe { T::from_ptr(native::mono_gchandle_get_target(self.id)) }
     }
 
@@ -45,8 +52,50 @@ impl<T: Object> Debug for GcHandle<T> {
     }
 }
 
-unsafe impl<T: Object> Referencable for GcHandle<T> {
+impl<T: Object> Clone for GcHandle<T> {
+    fn clone(&self) -> GcHandle<T> {
+        GcHandle::new(self.target(BYPASS))
+    }
+}
+
+unsafe impl<T: Object> Referenceable for GcHandle<T> {
     fn ptr(&self) -> *mut native::MonoObject {
-        self.target().ptr()
+        // pointers are harmless (not our responsibility)
+        // thus bypass is safe
+        self.target(BYPASS).ptr()
+    }
+}
+
+#[derive(Debug)]
+pub struct PinnedGcHandle<T: Object> {
+    handle: GcHandle<T>,
+    pin: T,
+}
+
+impl<T: Object> PinnedGcHandle<T> {
+    pub fn new(obj: T) -> PinnedGcHandle<T> {
+        unsafe {
+            PinnedGcHandle {
+                handle: GcHandle {
+                    id: native::mono_gchandle_new(obj.ptr(), 1/*true*/),
+                    phantom: PhantomData,
+                },
+                pin: obj,
+            }
+        }
+    }
+}
+
+impl<T: Object> Deref for PinnedGcHandle<T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        &self.pin
+    }
+}
+
+impl<T: Object> Clone for PinnedGcHandle<T> {
+    fn clone(&self) -> PinnedGcHandle<T> {
+        PinnedGcHandle::new(self.handle.target(BYPASS))
     }
 }

@@ -4,7 +4,7 @@ use metadata::Class;
 use runtime::Mono;
 use native;
 
-pub unsafe trait MonoPrimitive: Debug {
+pub unsafe trait Primitive: Debug {
     unsafe fn class_unsafe() -> Class<'static>;
 
     // This takes a &Mono because these classes only exist
@@ -14,7 +14,7 @@ pub unsafe trait MonoPrimitive: Debug {
     }
 }
 
-unsafe impl MonoPrimitive for i32 {
+unsafe impl Primitive for i32 {
     unsafe fn class_unsafe() -> Class<'static> {
         Class::from_raw(native::mono_get_int32_class())
     }

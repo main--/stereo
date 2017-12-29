@@ -45,7 +45,6 @@ pub mod runtime;
 
 use managed::array::*;
 use managed::object::*;
-use managed::string::*;
 use managed::*;
 use metadata::*;
 use safety::*;
@@ -65,12 +64,16 @@ fn main() {
         let class = image.class_from_name(Some("MyNS"), "Test").unwrap();
         let main = class.methods().find(|x| x.name() == "Main").unwrap();
         println!("main: {:?}", main);
-        let args = ObjectArray::from_iter(mono.root_domain(),
+        let args = ObjectArray::from_iter::<_, MonoString, _>(mono.root_domain(),
                                           &mono.class_string(),
                                           &[
+                                              /*
                                               Some(MonoString::empty(mono.root_domain(), &strat).downcast()),
                                               Some(MonoString::new("yay", mono.root_domain(), &strat).downcast()),
-                                                  ],
+                                               */
+                                              MonoString::empty(mono.root_domain(), &strat),
+                                              MonoString::new("yay", mono.root_domain(), &strat),
+                                              ],
                                           &strat);
         /*
         let mainargs = ObjectArray::from_iter(mono.root_domain(),
@@ -78,7 +81,13 @@ fn main() {
                                               &[args]);
         let result = main.invoke_array(Null, &mainargs);
          */
-        let result = main.invoke(None, &[MonoValue::ObjectRef(Some(args.downcast()))], &strat);
+
+        println!("{:?}", &*args);
+
+
+        let result = main.invoke(None, &[MonoValue::ObjectRef(Some(args.downcast())/*.into()*/)], &strat);
+        let result = result.unwrap().unwrap();
+        let result: i32 = *Boxed::cast(&result);
         println!("{:?}", result);
     }
 

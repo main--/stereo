@@ -1,7 +1,7 @@
-use managed::{Referencable, Object, GcHandle};
+use managed::{Referenceable, Object, GcHandle};
 
 pub unsafe trait GcPtrStrategy<T: Object> {
-    type Target: Referencable;
+    type Target: Referenceable;
 
     fn wrap(&self, t: T) -> Self::Target;
 }

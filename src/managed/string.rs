@@ -5,7 +5,7 @@ use widestring::{WideStr, WideString};
 
 use safety::BYPASS;
 use runtime::AppDomain;
-use super::{Referencable, Object};
+use super::{Referenceable, Object};
 use native;
 
 #[derive(Clone, Copy)] // strings are immutable
@@ -62,7 +62,7 @@ impl Display for MonoString {
     }
 }
 
-unsafe impl Referencable for MonoString {
+unsafe impl Referenceable for MonoString {
     fn ptr(&self) -> *mut native::MonoObject { self.0 as *mut _ }
 }
 
