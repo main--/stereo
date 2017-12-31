@@ -69,6 +69,12 @@ impl<'image> Method<'image> {
         }
     }
 
+    pub fn get_thunk(&self) -> *const c_void {
+        unsafe {
+            native::mono_method_get_unmanaged_thunk(self.method)
+        }
+    }
+
     pub fn invoke<S>(&self,
                      this: Option<GenericObject>, // FIXME: mb support value types?
                      params: &[MonoValue<S>],

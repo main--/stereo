@@ -79,6 +79,16 @@ impl Mono {
         }
     }
 
+    // FIXME: remove this (smooth out our story)
+    pub unsafe fn get() -> Mono {
+        let domain = native::mono_get_root_domain();
+        Mono {
+            root_domain: ManuallyDrop::new(AppDomain::from_raw(domain)),
+            corlib: ManuallyDrop::new(Image::from_raw(native::mono_get_corlib())),
+            unsync: PhantomData,
+        }
+    }
+
     pub fn foreign_handle<'a>(&'a self) -> MonoRef<'static> {
         // FIXME: this is only valid because Mono can never die
         let ptr: *const Mono = self;

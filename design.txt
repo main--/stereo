@@ -2,7 +2,7 @@ mono_object_new / mono_object_new_specific
 mono_array_new_full (dimensions)
 mono_array_new_specific
 
-(objectarray in general)
+
 
 mono_ldstr
 string interning (???)

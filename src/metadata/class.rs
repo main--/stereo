@@ -8,7 +8,7 @@ use std::borrow::Cow;
 use super::*;
 use native;
 
-
+#[derive(Clone)]
 pub struct Class<'image> {
     image: PhantomData<&'image Image<'image>>,
     class: *mut native::MonoClass,
@@ -26,7 +26,19 @@ impl<'image> Class<'image> {
         self.class
     }
 
+    // TODO: naming
+    pub fn outer(&self) -> Option<Class<'image>> {
+        unsafe {
+            let outer = native::mono_class_get_nesting_type(self.class);
+            wrap_ptr!(outer, Class)
+        }
+    }
+
     pub fn namespace(&self) -> Option<&'image str> {
+        self.namespace_strict().or_else(|| self.outer().and_then(|x| x.namespace()))
+    }
+
+    pub fn namespace_strict(&self) -> Option<&'image str> {
         unsafe {
             let ns = native::mono_class_get_namespace(self.class);
             if *ns == 0 {
@@ -47,23 +59,23 @@ impl<'image> Class<'image> {
         TypeToken(unsafe { native::mono_class_get_type_token(self.class) })
     }
 
-    pub fn methods<'a>(&'a self) -> ClassMethodsIter<'a, 'image> {
+    pub fn methods(&self) -> ClassMethodsIter<'image> {
         ClassMethodsIter {
-            class: self,
+            class: self.clone(),
             iter: ptr::null_mut(),
             index: 0,
         }
     }
 }
 
-pub struct ClassMethodsIter<'class, 'image: 'class> {
-    class: &'class Class<'image>,
+pub struct ClassMethodsIter<'image> {
+    class: Class<'image>,
     iter: *mut c_void,
     index: usize,
 }
 
 
-impl<'class, 'image> Iterator for ClassMethodsIter<'class, 'image> {
+impl<'image> Iterator for ClassMethodsIter<'image> {
     type Item = Method<'image>;
 
     fn next(&mut self) -> Option<Method<'image>> {
@@ -89,16 +101,22 @@ impl<'class, 'image> Iterator for ClassMethodsIter<'class, 'image> {
     }
 }
 
-impl<'class, 'image> ExactSizeIterator for ClassMethodsIter<'class, 'image> {}
+impl<'image> ExactSizeIterator for ClassMethodsIter<'image> {}
 
 
 
 impl<'image> Debug for Class<'image> {
     fn fmt(&self, fmt: &mut Formatter) -> FmtResult {
-        if let Some(ns) = self.namespace() {
+        if let Some(outer) = self.outer() {
+            outer.fmt(fmt)?;
+            fmt.write_str("/")?;
+        }
+
+        if let Some(ns) = self.namespace_strict() {
             fmt.write_str(ns)?;
             fmt.write_str(".")?;
         }
+
         fmt.write_str(self.name().as_ref())
     }
 }

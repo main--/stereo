@@ -3,9 +3,13 @@ name = "stereo"
 version = "0.1.0"
 authors = ["main() <main@ehvag.de>"]
 
+[profile.dev]
+panic = "abort"
+
 [dependencies]
 cstr-macro = "0.1"
 widestring = "0.2.2"
+lazy_static = "1.0"
 
 [build-dependencies]
 bindgen = "0.26.3"

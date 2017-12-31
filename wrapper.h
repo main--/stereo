@@ -2,6 +2,7 @@
 #include <mono/metadata/mono-gc.h>
 #include <mono/metadata/threads.h>
 #include <mono/metadata/debug-helpers.h>
+#include <mono/metadata/tokentype.h>
 #include <mono/jit/jit.h>
 
 

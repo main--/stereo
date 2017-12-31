@@ -1,54 +1,57 @@
-#[macro_use] extern crate cstr_macro;
-extern crate widestring;
+extern crate stereo;
 
-mod native {
-    #![allow(dead_code)]
-    #![allow(non_upper_case_globals)]
-    #![allow(non_camel_case_types)]
-    #![allow(non_snake_case)]
+use stereo::managed::array::*;
+use stereo::managed::object::*;
+use stereo::managed::*;
+use stereo::metadata::*;
+use stereo::safety::*;
+use stereo::runtime::*;
 
-    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
-}
+#[macro_use] extern crate lazy_static;
+mod myns {
+    use stereo::runtime::Mono;
+    use stereo::metadata::{Image, MethodToken};
+    use stereo::managed::{Referenceable, Object, Boxed};
+    use stereo::managed::array::ObjectArray;
+    use stereo::managed::object::GenericObject;
+    use std::{mem, ptr};
+    use std::mem::ManuallyDrop;
+    pub struct MTest;
 
-macro_rules! wrap_ptr {
-    ($eptr:expr, $wrap:ident) => (
-        {
-            let ptr = $eptr ;
-            if ptr.is_null() {
-                None
-            } else {
-                Some ( $wrap ::from_raw ( ptr ) )
+    lazy_static! {
+        static ref IMAGE_REF: Image<'static> = {
+            unsafe {
+                let mono = ManuallyDrop::new(Mono::get());
+                let image: Image = mono.open_image("file.exe").unwrap();
+                mem::transmute(image) // transmute the lifetime because fuck everything
+            }
+        };
+
+        static ref MTEST_FOO_THUNK: extern "system" fn(*mut (), *mut *mut ()) -> i32 = {
+            let method = IMAGE_REF.get_method(MethodToken(2 | 0x06000000)).unwrap();
+            unsafe { mem::transmute(method.get_thunk()) }
+        };
+    }
+
+    impl MTest {
+        pub fn Main(args: &ObjectArray) -> Result<i32, GenericObject> {
+            unsafe {
+                // TODO: typecheck (want to do this the hard way)
+
+
+
+                let mut exception = ptr::null_mut();
+                //let args = ptr::null_mut();
+                let ret = MTEST_FOO_THUNK(args.ptr() as *mut (), &mut exception);
+                if exception.is_null() {
+                    Ok(ret)
+                } else {
+                    Err(GenericObject::from_ptr(exception as *mut _))
+                }
             }
         }
-    )
-}
-
-
-macro_rules! gc_ret {
-    ( $( pub fn $fname:ident ( $( $pname:ident : $ptype:ty ),* ) -> $ret:ty $body:block )+ ) => {
-        $(
-            pub fn $fname <S: ::safety::GcPtrStrategy < $ret >> (
-                $( $pname : $ptype ),* , strat: &S
-                    ) -> S::Target {
-                strat.wrap( $body )
-            }
-        )+
     }
 }
-
-
-pub mod managed;
-pub mod metadata;
-pub mod safety;
-pub mod runtime;
-
-
-use managed::array::*;
-use managed::object::*;
-use managed::*;
-use metadata::*;
-use safety::*;
-use runtime::*;
 
 fn main() {
     println!("lets test ergonomics");
@@ -58,37 +61,61 @@ fn main() {
 
     let mono = Mono::init().unwrap();
     {
-        let image = mono.open_image("/tmp/file.exe").unwrap();
+        /*
+        let foreign = mono.foreign_handle();
+        std::thread::spawn(move || {
+            {
+                let mono = foreign.attach();
+                let image = mono.open_image("/tmp/file.exe").unwrap();
+            }
+            unsafe { native::mono_thread_current() };
+            //mono.root_domain().load_assembly(&image).unwrap();
+        }).join().unwrap();
+        println!("thread done");
+         */
+
+        let image = mono.open_image("file.exe").unwrap();
         mono.root_domain().load_assembly(&image).unwrap();
 
+        let args = ObjectArray::from_iter::<_, MonoString, _>(mono.root_domain(),
+                                          &mono.class_string(),
+                                          &[
+                                              //MonoString::empty(mono.root_domain(), &strat),
+                                              MonoString::new("yay", mono.root_domain(), &strat),
+                                          ], &strat);
+        let result = myns::MTest::Main(&args);
+        println!("result {:?}", result);
+
+        /*
         let class = image.class_from_name(Some("MyNS"), "Test").unwrap();
         let main = class.methods().find(|x| x.name() == "Main").unwrap();
         println!("main: {:?}", main);
         let args = ObjectArray::from_iter::<_, MonoString, _>(mono.root_domain(),
                                           &mono.class_string(),
                                           &[
-                                              /*
+                                              / *
                                               Some(MonoString::empty(mono.root_domain(), &strat).downcast()),
                                               Some(MonoString::new("yay", mono.root_domain(), &strat).downcast()),
-                                               */
+                                               * /
                                               MonoString::empty(mono.root_domain(), &strat),
                                               MonoString::new("yay", mono.root_domain(), &strat),
                                               ],
                                           &strat);
-        /*
+        / *
         let mainargs = ObjectArray::from_iter(mono.root_domain(),
                                               &mono.class_object(),
                                               &[args]);
         let result = main.invoke_array(Null, &mainargs);
-         */
+         * /
 
         println!("{:?}", &*args);
 
 
-        let result = main.invoke(None, &[MonoValue::ObjectRef(Some(args.downcast())/*.into()*/)], &strat);
+        let result = main.invoke(None, &[MonoValue::ObjectRef(Some(args.downcast())/ *.into()* /)], &strat);
         let result = result.unwrap().unwrap();
         let result: i32 = *Boxed::cast(&result);
         println!("{:?}", result);
+         */
     }
 
     // ??????

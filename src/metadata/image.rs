@@ -1,6 +1,7 @@
 use std::ptr;
 use std::marker::PhantomData;
 use std::ffi::CString;
+use std::ops::Range;
 
 use runtime::Mono;
 use super::*;
@@ -14,6 +15,7 @@ pub struct Image<'mono> {
     mono: PhantomData<&'mono Mono>,
     image: *mut native::MonoImage,
 }
+unsafe impl<'mono> Sync for Image<'mono> {} // FIXME: smooth out our story here
 
 impl<'mono> Image<'mono> {
     /// This takes ownership of the reference (you must not close it yourself).
@@ -49,6 +51,19 @@ impl<'mono> Image<'mono> {
                                                    name.as_ptr()), Class)
         }
     }
+
+    // TODO: rename Class to Type everywhere
+    pub fn classes<'a>(&'a self) -> ClassesIter<'a> {
+        unsafe {
+            let table = native::mono_image_get_table_info(self.image, native::MonoMetaTableEnum::MONO_TABLE_TYPEDEF as i32);
+            let count = native::mono_table_info_get_rows(table) as u32;
+
+            ClassesIter {
+                image: self,
+                range: 1..count, // skip initial <module> type
+            }
+        }
+    }
 }
 
 impl<'mono> Clone for Image<'mono> {
@@ -66,5 +81,21 @@ impl<'mono> Clone for Image<'mono> {
 impl<'mono> Drop for Image<'mono> {
     fn drop(&mut self) {
         unsafe { native::mono_image_close(self.image) };
+    }
+}
+
+
+pub struct ClassesIter<'a> {
+    image: &'a Image<'a>,
+    range: Range<u32>,
+}
+
+impl<'a> Iterator for ClassesIter<'a> {
+    type Item = Class<'a>;
+
+    fn next(&mut self) -> Option<Class<'a>> {
+        self.range.next()
+            .map(|i| TypeToken((i + 1) | native::MonoTokenType::MONO_TOKEN_TYPE_DEF as u32)) // make tokens
+            .map(|t| self.image.get_class(t).unwrap())
     }
 }
