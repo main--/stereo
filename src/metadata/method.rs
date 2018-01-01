@@ -8,9 +8,8 @@ use std::borrow::Cow;
 use super::*;
 use native;
 use safety::GcPtrStrategy;
-use managed::{Referenceable, Object, MonoValue, ObjectReference, Primitive};
+use managed::{Referenceable, Object, MonoValue, ObjectReference, StaticallyTyped, Array};
 use managed::object::{GenericObject}; //, ObjectReference};
-use managed::array::ObjectArray;
 
 pub struct Method<'image> {
     image: PhantomData<&'image Image<'image>>,
@@ -87,7 +86,7 @@ impl<'image> Method<'image> {
         unsafe {
             let mut args: Vec<_> = argtypes.zip(params).map(|(typ, val)| {
                 let (result, valtype) = match *val {
-                    MonoValue::I32(x) => (x as *mut c_void, i32::class_unsafe()),
+                    MonoValue::I32(x) => (x as *mut c_void, i32::class()),
                     MonoValue::ObjectRef(Some(ref x)) =>
                         (x.ptr() as *mut c_void, GenericObject::from_ptr(x.ptr()).class()),
                     MonoValue::ObjectRef(None) => return ptr::null_mut(),
@@ -131,6 +130,7 @@ impl<'image> Method<'image> {
         }
     }
 
+    /*
     // TODO: rework all of this
     #[deprecated]
     pub fn invoke_array<T: Referenceable>(&self, this: T, params: &ObjectArray) -> Result<ObjectReference, GenericObject> {
@@ -149,6 +149,7 @@ impl<'image> Method<'image> {
             }
         }
     }
+*/
 }
 
 impl<'image> Debug for Method<'image> {

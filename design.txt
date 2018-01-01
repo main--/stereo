@@ -6,11 +6,9 @@ mono_array_new_specific
 
 mono_ldstr
 string interning (???)
-mono_object_hash
-mono_object_to_string
 mono_object_clone
 
-(un)boxing
+
 
 obj_get_domain
 
@@ -24,9 +22,7 @@ mono_object_get_virtual_method
 mono_get_delegate_invoke
 mono_runtime_delegate_invoke
 mono_runtime_invoke_array
-mono_method_get_umanaged_thunk
 
-proper mono_runtime_invoke
 running Main (plethora of ways)
 remoting ???????
 field get/set instance/static
@@ -38,9 +34,6 @@ reference queues
 appdomains, ids, names
 appdomain get/set, foreach, loading assemblies
 getting/setting appdomains: just always set the appropriate domain, it's cheap when we already are on that domain
-
-mono_get_corlib
-mono_get_*_class
 
 assemblies, esp. bundled ones (update: bundled assemblies are just a fancy way of loading images from data, supporting this API is not really necessary)
 vtable API
@@ -76,6 +69,28 @@ method api
 icalls
 
 GC api?
+
+
+
+
+
+
+appdomains 2.0
+--------------
+
+* on every managed invocation, validate:
+ - get current appdomain (if thread not attached, this should be NULL)
+ - assert that it's not null
+ - assert that it matches appdomains of all involved objects
+ - assert mono_assembly_loaded for our function's assembly (SLOW!)
+* you can just appdomain.set() your current appdomain (is that bad?)
+* thread attach happens silently and lazily?
+* TODO: explore proof-based shortcuts (holding an Assembly proves that I loaded the associated image, skip this check)
+
+
+
+
+
 
 
 threads api

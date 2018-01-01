@@ -1,6 +1,5 @@
 extern crate stereo;
 
-use stereo::managed::array::*;
 use stereo::managed::object::*;
 use stereo::managed::*;
 use stereo::metadata::*;
@@ -11,30 +10,26 @@ use stereo::runtime::*;
 mod myns {
     use stereo::runtime::Mono;
     use stereo::metadata::{Image, MethodToken};
-    use stereo::managed::{Referenceable, Object, Boxed};
-    use stereo::managed::array::ObjectArray;
+    use stereo::managed::{Referenceable, Object, Boxed, Array, MonoString};
     use stereo::managed::object::GenericObject;
     use std::{mem, ptr};
     use std::mem::ManuallyDrop;
+
     pub struct MTest;
 
     lazy_static! {
-        static ref IMAGE_REF: Image<'static> = {
-            unsafe {
-                let mono = ManuallyDrop::new(Mono::get());
-                let image: Image = mono.open_image("file.exe").unwrap();
-                mem::transmute(image) // transmute the lifetime because fuck everything
-            }
-        };
+        pub static ref MONO: Mono = Mono::init().unwrap();
+        pub static ref IMAGE: Image<'static> = MONO.open_image_from_data(
+            include_bytes!("../file.dll"), "file").unwrap();
 
         static ref MTEST_FOO_THUNK: extern "system" fn(*mut (), *mut *mut ()) -> i32 = {
-            let method = IMAGE_REF.get_method(MethodToken(2 | 0x06000000)).unwrap();
+            let method = IMAGE.get_method(MethodToken(2 | 0x06000000)).unwrap();
             unsafe { mem::transmute(method.get_thunk()) }
         };
     }
 
     impl MTest {
-        pub fn Main(args: &ObjectArray) -> Result<i32, GenericObject> {
+        pub fn Main(args: &Array<MonoString>) -> Result<i32, GenericObject> {
             unsafe {
                 // TODO: typecheck (want to do this the hard way)
 
@@ -59,7 +54,8 @@ fn main() {
     let strat = unsafe { StackRefs::i_promise_to_never_store_references_anywhere_other_than_the_stack() };
     //let strat = GcHandles;
 
-    let mono = Mono::init().unwrap();
+    let mono = &myns::MONO;
+    //let mono = Mono::init().unwrap();
     {
         /*
         let foreign = mono.foreign_handle();
@@ -68,21 +64,24 @@ fn main() {
                 let mono = foreign.attach();
                 let image = mono.open_image("/tmp/file.exe").unwrap();
             }
-            unsafe { native::mono_thread_current() };
+            unsafe { native::mono_thread_current()+ };
             //mono.root_domain().load_assembly(&image).unwrap();
         }).join().unwrap();
         println!("thread done");
          */
 
-        let image = mono.open_image("file.exe").unwrap();
-        mono.root_domain().load_assembly(&image).unwrap();
+        //let image = mono.open_image("file.exe").unwrap();
+        mono.root_domain().load_assembly(&myns::IMAGE).unwrap();
 
-        let args = ObjectArray::from_iter::<_, MonoString, _>(mono.root_domain(),
-                                          &mono.class_string(),
-                                          &[
-                                              //MonoString::empty(mono.root_domain(), &strat),
-                                              MonoString::new("yay", mono.root_domain(), &strat),
-                                          ], &strat);
+        // * gc ptr strat
+        // * appdomain strat
+        // * ggf typechecking strat ???
+
+        let args = Array::from_iter(mono.root_domain(),
+                                    &[
+                                        MonoString::empty(mono.root_domain(), &strat),
+                                        MonoString::new("yay", mono.root_domain(), &strat),
+                                    ], &strat);
         let result = myns::MTest::Main(&args);
         println!("result {:?}", result);
 

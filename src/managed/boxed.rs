@@ -17,7 +17,7 @@ impl<T: Primitive> Boxed<T> {
             unsafe {
                 let myptr: *const T = &t;
                 let ptr = native::mono_value_box(domain.as_raw(),
-                                                 T::class_unsafe().as_raw(),
+                                                 T::class().as_raw(),
                                                  myptr as *mut _);
 
                 Boxed {
@@ -31,7 +31,7 @@ impl<T: Primitive> Boxed<T> {
     // TODO: remove this
     pub fn cast<O: Object>(t: &O) -> Boxed<T> {
         unsafe {
-            assert_eq!(t.class().as_raw(), T::class_unsafe().as_raw());
+            assert_eq!(t.class().as_raw(), T::class().as_raw());
             Boxed { ptr: t.ptr(), phantom: PhantomData }
         }
     }

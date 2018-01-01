@@ -17,6 +17,8 @@ pub struct Mono {
     corlib: ManuallyDrop<Image<'static>>,
     unsync: PhantomData<*mut ()>,
 }
+// FIXME: smooth out our story
+unsafe impl Sync for Mono {}
 
 pub struct MonoRef<'a> {
     mono: &'a Mono,
@@ -127,6 +129,24 @@ impl Mono {
         unsafe {
             let mut status = native::MonoImageOpenStatus::MONO_IMAGE_OK;
             let image = native::mono_image_open(path.as_ptr(), &mut status);
+            match status {
+                native::MonoImageOpenStatus::MONO_IMAGE_OK => Ok(Image::from_raw(image)),
+                error => Err(error),
+            }
+        }
+    }
+
+    pub fn open_image_from_data<'a>(&'a self, data: &'static [u8], name: &str) -> Result<Image<'a>, native::MonoImageOpenStatus> {
+        // FIXME same
+        let name = CString::new(name).unwrap();
+        unsafe {
+            let mut status = native::MonoImageOpenStatus::MONO_IMAGE_OK;
+            let image = native::mono_image_open_from_data_with_name(data.as_ptr() as *mut _,
+                                                                    data.len() as u32,
+                                                                    0 /*false*/,
+                                                                    &mut status,
+                                                                    0 /*false*/,
+                                                                    name.as_ptr());
             match status {
                 native::MonoImageOpenStatus::MONO_IMAGE_OK => Ok(Image::from_raw(image)),
                 error => Err(error),

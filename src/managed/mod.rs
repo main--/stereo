@@ -6,7 +6,7 @@ use native;
 
 // These wrap actual managed objects
 mod string;
-pub mod array;
+mod array;
 pub mod object;
 // pub mod exception;
 mod boxed;
@@ -17,12 +17,14 @@ mod weakhandle;
 mod value;
 mod primitive;
 
+// TODO: sort these?
 pub use self::weakhandle::WeakHandle;
 pub use self::gchandle::GcHandle;
 pub use self::value::MonoValue;
 pub use self::string::MonoString;
 pub use self::primitive::Primitive;
 pub use self::boxed::Boxed;
+pub use self::array::Array;
 
 use self::object::{GenericObject};
 
@@ -99,6 +101,14 @@ unsafe impl Referenceable for Null {
     fn ptr(&self) -> *mut native::MonoObject { ptr::null_mut() }
 }
 
+
+
+pub unsafe trait StaticallyTyped {
+    // TODO: this can be safe
+    unsafe fn class() -> Class<'static>;
+
+    const IS_REFERENCE: bool;
+}
 
 /*
 pub unsafe trait Array: Object {

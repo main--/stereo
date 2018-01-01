@@ -5,7 +5,8 @@ use widestring::{WideStr, WideString};
 
 use safety::BYPASS;
 use runtime::AppDomain;
-use super::{Referenceable, Object};
+use metadata::Class;
+use super::{Referenceable, Object, StaticallyTyped};
 use native;
 
 #[derive(Clone, Copy)] // strings are immutable
@@ -68,4 +69,12 @@ unsafe impl Referenceable for MonoString {
 
 unsafe impl Object for MonoString {
     unsafe fn from_ptr(ptr: *mut native::MonoObject) -> MonoString { MonoString(ptr as *mut _) }
+}
+
+unsafe impl StaticallyTyped for MonoString {
+    unsafe fn class() -> Class<'static> {
+        Class::from_raw(native::mono_get_string_class())
+    }
+
+    const IS_REFERENCE: bool = true;
 }
